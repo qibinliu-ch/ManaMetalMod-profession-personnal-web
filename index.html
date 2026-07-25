@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>魔法金属 · 职业星图</title>
+<style>
+  :root {
+    --bg: #070b16;
+    --text: #e8ecf4;
+    --muted: #93a0b8;
+    --accent: #ffd166;
+    --panel-bg: rgba(13, 19, 36, 0.92);
+    --panel-border: rgba(255, 255, 255, 0.12);
+    --orb-class: 84px;
+    --orb-skill: 62px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    background: radial-gradient(ellipse at 50% 42%, #101a33 0%, #0a1122 45%, var(--bg) 100%);
+    color: var(--text);
+    font-family: "YouYuan", "幼圆", "Yuanti SC", "Hiragino Maru Gothic ProN", "Arial Rounded MT Bold", "PingFang SC", "Microsoft YaHei", sans-serif;
+    letter-spacing: 0;
+    overflow: hidden;
+    user-select: none;
+  }
+  button { font-family: inherit; }
+
+  /* star field */
+  .star-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    animation: twinkle 5s ease-in-out infinite alternate;
+  }
+  .star-layer.s2 { animation-duration: 7s; animation-delay: 1.2s; }
+  .star-layer.s3 { animation-duration: 9s; animation-delay: 2.4s; }
+  @keyframes twinkle { from { opacity: 0.55; } to { opacity: 1; } }
+
+  header {
+    position: fixed;
+    top: 18px;
+    left: 24px;
+    z-index: 20;
+    pointer-events: none;
+  }
+  header h1 { font-size: 20px; font-weight: 600; }
+  header p { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  /* 3D stage */
+  #stage {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    perspective: 1400px;
+    perspective-origin: 50% 42%;
+    cursor: grab;
+    touch-action: none;
+    transition: opacity 0.32s ease, transform 0.32s ease;
+  }
+  #stage.dragging { cursor: grabbing; }
+  #stage.switching { opacity: 0; transform: scale(0.94); }
+
+  #orbit-layer {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 0;
+    height: 0;
+    transform-style: preserve-3d;
+  }
+  #orbit-layer > * { position: absolute; left: 0; top: 0; }
+
+  .orbit-ring {
+    border: 1px dashed rgba(255, 255, 255, 0.10);
+    border-radius: 50%;
+    pointer-events: none;
+  }
+
+  .orb {
+    will-change: transform;
+    cursor: pointer;
+  }
+  .orb-body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+    position: relative;
+    isolation: isolate;
+  }
+  .orb:hover .orb-body { transform: scale(1.14); }
+
+  /* class planet */
+  .class-orb .orb-body {
+    width: var(--orb-class);
+    height: var(--orb-class);
+    background:
+      radial-gradient(circle at 29% 24%, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.38) 9%, transparent 23%),
+      radial-gradient(circle at 42% 38%,
+        hsl(var(--hue), 82%, 86%) 0%,
+        hsl(var(--hue), 70%, 70%) 38%,
+        hsl(var(--hue), 58%, 54%) 70%,
+        hsl(var(--hue), 48%, 36%) 100%);
+    box-shadow:
+      0 0 0 5px hsla(var(--hue), 90%, 88%, 0.05),
+      0 0 22px hsla(var(--hue), 90%, 74%, 0.44),
+      0 0 46px hsla(var(--hue), 85%, 62%, 0.12),
+      inset 8px 7px 16px rgba(255, 255, 255, 0.20),
+      inset -9px -11px 18px hsla(var(--hue), 55%, 18%, 0.34);
+    border: 1px solid hsla(var(--hue), 100%, 94%, 0.82);
+  }
+  .class-orb .orb-body::before,
+  #panel .p-head .p-planet::before {
+    content: "";
+    position: absolute;
+    inset: -6px;
+    z-index: -1;
+    border-radius: 50%;
+    border: 1px solid hsla(var(--hue), 92%, 86%, 0.28);
+    background: radial-gradient(circle, hsla(var(--hue), 95%, 78%, 0.10) 52%, transparent 72%);
+    box-shadow: 0 0 15px hsla(var(--hue), 95%, 76%, 0.2);
+  }
+  .class-orb .orb-body::after,
+  #panel .p-head .p-planet::after {
+    content: "";
+    position: absolute;
+    inset: 2px;
+    z-index: 0;
+    border-radius: 50%;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse at 67% 27%, rgba(255, 255, 255, 0.38) 0 5%, transparent 12%),
+      radial-gradient(ellipse at 32% 64%, hsla(var(--hue), 100%, 96%, 0.34) 0 8%, transparent 18%),
+      linear-gradient(164deg, transparent 31%, rgba(255, 255, 255, 0.34) 38%, transparent 46%),
+      linear-gradient(18deg, transparent 48%, hsla(var(--hue), 100%, 94%, 0.20) 56%, transparent 65%);
+    box-shadow: inset 3px 3px 7px rgba(255, 255, 255, 0.2);
+    animation: planetMist 12s linear infinite;
+  }
+  .class-orb:hover .orb-body {
+    box-shadow:
+      0 0 0 7px hsla(var(--hue), 90%, 88%, 0.08),
+      0 0 32px hsla(var(--hue), 95%, 76%, 0.72),
+      0 0 62px hsla(var(--hue), 88%, 64%, 0.20),
+      inset 8px 7px 16px rgba(255, 255, 255, 0.24),
+      inset -9px -11px 18px hsla(var(--hue), 55%, 18%, 0.30);
+  }
+  .class-orb .orb-name {
+    position: relative;
+    z-index: 2;
+    font-size: 15px;
+    font-weight: 600;
+    color: #fff;
+    text-shadow: 0 1px 4px rgba(8, 17, 35, 0.76), 0 0 12px hsla(var(--hue), 100%, 96%, 0.35);
+  }
+  @keyframes planetMist { to { transform: rotate(360deg); } }
+
+  /* skill satellite */
+  .skill-orb .orb-body {
+    width: var(--orb-skill);
+    height: var(--orb-skill);
+    background: radial-gradient(circle at 34% 30%, #2a3452, #141c31 70%);
+    border: 2px solid var(--tier-color, #4cc9f0);
+    box-shadow: 0 0 12px rgba(0, 0, 0, 0.6);
+    transition: transform 0.25s ease, box-shadow 0.25s ease, filter 0.25s ease;
+  }
+  .skill-orb:hover .orb-body {
+    box-shadow: 0 0 22px var(--tier-color, #4cc9f0);
+  }
+  .skill-orb.is-filter-match .orb-body {
+    box-shadow:
+      0 0 0 3px rgba(255, 255, 255, 0.12),
+      0 0 26px var(--tier-color, #4cc9f0),
+      0 0 52px var(--tier-color, #4cc9f0);
+  }
+  .skill-orb.is-filter-match:hover .orb-body {
+    box-shadow:
+      0 0 0 4px rgba(255, 255, 255, 0.18),
+      0 0 34px var(--tier-color, #4cc9f0),
+      0 0 64px var(--tier-color, #4cc9f0);
+  }
+  .skill-orb.is-filter-dim .orb-body { filter: saturate(0.35) brightness(0.72); }
+  .skill-orb img {
+    width: 38px;
+    height: 38px;
+    image-rendering: pixelated;
+    border-radius: 6px;
+  }
+  .skill-orb .skill-name {
+    position: absolute;
+    top: calc(100% + 5px);
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 12px;
+    white-space: nowrap;
+    color: var(--text);
+    text-shadow: 0 1px 3px #000, 0 0 6px #000;
+  }
+
+  /* center core (billboarded, lives inside the 3D scene) */
+  .sun {
+    width: 168px;
+    height: 168px;
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    isolation: isolate;
+    background:
+      radial-gradient(circle at 34% 27%, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.75) 8%, transparent 23%),
+      radial-gradient(circle at 44% 42%, #f8ffff 0%, #e7faff 27%, #c8e8f3 52%, #b8cfe4 74%, #7891b3 100%);
+    border: 1px solid rgba(245, 253, 255, 0.92);
+    box-shadow:
+      0 0 0 8px rgba(205, 242, 255, 0.035),
+      0 0 38px rgba(204, 244, 255, 0.58),
+      0 0 90px rgba(153, 213, 244, 0.28),
+      0 0 150px rgba(255, 221, 174, 0.10),
+      inset 14px 12px 24px rgba(255, 255, 255, 0.46),
+      inset -16px -20px 30px rgba(70, 91, 145, 0.26);
+    animation: sunpulse 6s ease-in-out infinite alternate;
+    pointer-events: none;
+  }
+  .sun::before {
+    content: "";
+    position: absolute;
+    inset: -13px;
+    z-index: -1;
+    border-radius: 50%;
+    border: 1px solid rgba(221, 249, 255, 0.22);
+    background: radial-gradient(circle, rgba(203, 242, 255, 0.12) 48%, rgba(255, 226, 185, 0.05) 62%, transparent 71%);
+    box-shadow: 0 0 28px rgba(211, 247, 255, 0.16);
+  }
+  .sun::after {
+    content: "";
+    position: absolute;
+    inset: 4px;
+    z-index: 0;
+    border-radius: 50%;
+    background:
+      radial-gradient(ellipse at 66% 25%, rgba(255, 245, 218, 0.62) 0 5%, transparent 14%),
+      radial-gradient(ellipse at 29% 69%, rgba(224, 207, 255, 0.35) 0 9%, transparent 21%),
+      linear-gradient(159deg, transparent 28%, rgba(255, 255, 255, 0.55) 36%, rgba(192, 236, 249, 0.14) 43%, transparent 51%),
+      linear-gradient(14deg, transparent 49%, rgba(255, 234, 202, 0.28) 57%, transparent 65%);
+    box-shadow: inset 5px 5px 14px rgba(255, 255, 255, 0.28);
+    animation: aetherDrift 18s linear infinite;
+  }
+  @keyframes sunpulse {
+    from {
+      box-shadow: 0 0 0 8px rgba(205, 242, 255, 0.035), 0 0 34px rgba(204, 244, 255, 0.50), 0 0 82px rgba(153, 213, 244, 0.22), 0 0 140px rgba(255, 221, 174, 0.08), inset 14px 12px 24px rgba(255,255,255,0.46), inset -16px -20px 30px rgba(70,91,145,0.26);
+    }
+    to {
+      box-shadow: 0 0 0 11px rgba(205, 242, 255, 0.055), 0 0 50px rgba(213, 248, 255, 0.68), 0 0 112px rgba(164, 221, 248, 0.34), 0 0 176px rgba(255, 221, 174, 0.13), inset 14px 12px 24px rgba(255,255,255,0.52), inset -16px -20px 30px rgba(70,91,145,0.22);
+    }
+  }
+  @keyframes aetherDrift { to { transform: rotate(-360deg); } }
+  .sun .sun-title,
+  .sun .sun-sub { position: relative; z-index: 2; }
+  .sun .sun-title { font-size: 21px; font-weight: 700; color: #294359; text-shadow: 0 1px 0 rgba(255,255,255,0.72); }
+  .sun .sun-sub { font-size: 12px; color: #537087; margin-top: 4px; }
+
+  .class-core {
+    width: 160px;
+    height: 160px;
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+    background:
+      radial-gradient(circle at 30% 24%, rgba(255,255,255,0.96) 0%, rgba(255,255,255,0.35) 10%, transparent 23%),
+      linear-gradient(156deg, transparent 35%, rgba(255,255,255,0.22) 43%, transparent 51%),
+      radial-gradient(circle at 43% 40%, hsl(var(--hue), 82%, 88%) 0%, hsl(var(--hue), 68%, 70%) 42%, hsl(var(--hue), 52%, 48%) 74%, hsl(var(--hue), 42%, 30%) 100%);
+    border: 1px solid hsla(var(--hue), 100%, 94%, 0.84);
+    box-shadow: 0 0 0 9px hsla(var(--hue), 90%, 88%, 0.04), 0 0 46px hsla(var(--hue), 90%, 72%, 0.45), 0 0 100px hsla(var(--hue), 84%, 62%, 0.14), inset 14px 12px 26px rgba(255,255,255,0.22), inset -18px -22px 30px hsla(var(--hue), 50%, 16%, 0.28);
+    pointer-events: none;
+  }
+  .class-core h2 { font-size: 19px; color: #fff; text-shadow: 0 1px 5px rgba(0,0,0,0.6); }
+  .class-core .core-attrs {
+    margin-top: 8px;
+    display: grid;
+    grid-template-columns: auto auto;
+    gap: 2px 8px;
+    font-size: 9px;
+    color: rgba(255, 255, 255, 0.85);
+    text-align: left;
+  }
+  .class-core .core-attrs b { color: #fff; font-weight: 600; }
+
+  /* hint overlay pinned under the core */
+  #core {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    z-index: 2;
+    pointer-events: none;
+  }
+  .core-spacer { width: 1px; margin: 0 auto; }
+  #core .hint {
+    margin-top: 14px;
+    font-size: 12px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  /* info panel */
+  #panel {
+    position: fixed;
+    right: 26px;
+    top: 50%;
+    transform: translate(24px, -50%);
+    width: 348px;
+    max-height: 78vh;
+    overflow-y: auto;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 20px 22px;
+    z-index: 30;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, transform 0.3s ease, visibility 0.3s;
+    backdrop-filter: blur(6px);
+  }
+  #panel.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translate(0, -50%);
+  }
+  #panel .p-head { display: flex; align-items: center; gap: 12px; }
+  #panel .p-head img {
+    width: 46px;
+    height: 46px;
+    border-radius: 8px;
+    border: 1px solid var(--panel-border);
+    background: #10182c;
+  }
+  #panel .p-head .p-planet {
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    flex: none;
+    position: relative;
+    isolation: isolate;
+    background:
+      radial-gradient(circle at 29% 24%, rgba(255,255,255,0.96) 0%, rgba(255,255,255,0.35) 12%, transparent 25%),
+      radial-gradient(circle at 42% 38%, hsl(var(--hue), 82%, 86%) 0%, hsl(var(--hue), 68%, 66%) 43%, hsl(var(--hue), 50%, 38%) 100%);
+    border: 1px solid hsla(var(--hue), 100%, 94%, 0.82);
+    box-shadow: 0 0 14px hsla(var(--hue), 90%, 72%, 0.35), inset -5px -6px 9px hsla(var(--hue), 55%, 18%, 0.24);
+  }
+  #panel h3 { font-size: 19px; }
+  #panel .p-badge {
+    display: inline-block;
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--badge-color, #4cc9f0);
+    border: 1px solid var(--badge-color, #4cc9f0);
+    border-radius: 4px;
+    padding: 1px 7px;
+  }
+  #panel .p-attrs {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px 14px;
+    margin-top: 14px;
+    font-size: 13px;
+  }
+  #panel .p-attrs .k { color: var(--muted); margin-right: 6px; }
+  #panel .p-lines { margin-top: 14px; }
+  #panel .p-line {
+    font-size: 13px;
+    line-height: 1.75;
+    color: #cdd6e6;
+    opacity: 0;
+    transform: translateY(7px);
+    transition: opacity 0.45s ease, transform 0.45s ease;
+  }
+  #panel.visible .p-line { opacity: 1; transform: translateY(0); }
+  #panel .p-link {
+    display: inline-block;
+    margin-top: 14px;
+    font-size: 12px;
+    color: var(--accent);
+    text-decoration: none;
+    border-bottom: 1px dashed rgba(255, 209, 102, 0.5);
+    padding-bottom: 1px;
+  }
+  #panel .p-link:hover { color: #ffe3a1; }
+  #panel .p-hint { margin-top: 12px; font-size: 12px; color: var(--muted); }
+
+  /* back button & skill filters */
+  #back {
+    position: fixed;
+    top: 20px;
+    right: 26px;
+    z-index: 25;
+    display: none;
+    align-items: center;
+    gap: 6px;
+    background: rgba(20, 28, 49, 0.85);
+    color: var(--text);
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  #back:hover { background: rgba(38, 50, 82, 0.95); }
+  #back.show { display: inline-flex; }
+
+  #legend {
+    position: fixed;
+    left: 24px;
+    bottom: 46px;
+    z-index: 25;
+    display: none;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  #legend.show { display: flex; }
+  #legend .tier-filter {
+    width: 126px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 10px;
+    color: var(--muted);
+    background: rgba(14, 21, 39, 0.78);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    backdrop-filter: blur(6px);
+    transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  #legend .tier-filter:hover {
+    color: var(--text);
+    background: rgba(29, 39, 65, 0.92);
+    border-color: rgba(255, 255, 255, 0.22);
+  }
+  #legend .tier-filter[aria-pressed="true"] {
+    color: #fff;
+    background: rgba(28, 36, 59, 0.96);
+    border-color: var(--c);
+    box-shadow: 0 0 14px color-mix(in srgb, var(--c) 42%, transparent);
+  }
+  #legend .tier-filter:focus-visible {
+    outline: 2px solid var(--c);
+    outline-offset: 2px;
+  }
+  #legend .dot {
+    width: 10px;
+    height: 10px;
+    flex: 0 0 10px;
+    border-radius: 50%;
+    border: 2px solid var(--c);
+  }
+  #legend .tier-filter[aria-pressed="true"] .dot {
+    background: var(--c);
+    box-shadow: 0 0 8px var(--c);
+  }
+
+  footer {
+    position: fixed;
+    left: 24px;
+    bottom: 14px;
+    z-index: 20;
+    font-size: 11px;
+    color: #5d6a84;
+  }
+  footer a { color: #7f8dab; text-decoration: none; }
+  footer a:hover { color: #b7c3de; }
+
+  @media (max-width: 760px) {
+    :root { --orb-class: 62px; --orb-skill: 50px; }
+    .class-orb .orb-name { font-size: 12px; }
+    .skill-orb img { width: 30px; height: 30px; }
+    .skill-orb .skill-name { font-size: 10px; }
+    .sun { width: 120px; height: 120px; }
+    .sun .sun-title { font-size: 16px; }
+    .class-core { width: 120px; height: 120px; padding: 11px; }
+    .class-core h2 { font-size: 14px; }
+    #panel {
+      left: 12px;
+      right: 12px;
+      top: auto;
+      bottom: 84px;
+      width: auto;
+      max-height: 44vh;
+      transform: translate(0, 16px);
+    }
+    #panel.visible { transform: translate(0, 0); }
+    #legend {
+      left: 12px;
+      right: 12px;
+      bottom: 34px;
+      flex-direction: row;
+      gap: 6px;
+      overflow-x: auto;
+      padding: 2px 0 5px;
+      scrollbar-width: none;
+    }
+    #legend::-webkit-scrollbar { display: none; }
+    #legend .tier-filter {
+      width: auto;
+      min-width: max-content;
+      height: 32px;
+      flex: 0 0 auto;
+      padding: 0 9px;
+      font-size: 11px;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .class-orb .orb-body::after,
+    #panel .p-head .p-planet::after,
+    .sun::after { animation: none; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>魔法金属 · 职业星图</h1>
+  <p>ManaMetalMod 十二职业技能导览</p>
+</header>
+
+<div id="stage">
+  <div id="orbit-layer"></div>
+</div>
+<div id="core"></div>
+
+<aside id="panel"></aside>
+<button id="back" type="button">&#8592; 返回星系</button>
+<div id="legend"></div>
+
+<footer>
+  数据来源：<a href="https://www.mcmod.cn/class/1111.html" target="_blank" rel="noopener">MC百科 · 魔法金属</a>
+  （BY-NC-SA 3.0） ·
+  <a href="https://www.mcmod.cn/item/list/1111-163.html" target="_blank" rel="noopener">技能列表</a> ·
+  <a href="https://www.mcmod.cn/post/4340.html" target="_blank" rel="noopener">职业测评</a>
+</footer>
+
+<script src="manametal_data.js"></script>
+<script>
+(function () {
+  "use strict";
+  var DATA = window.MANAMETAL_DATA;
+  var stage = document.getElementById("stage");
+  var orbitLayer = document.getElementById("orbit-layer");
+  var core = document.getElementById("core");
+  var panel = document.getElementById("panel");
+  var backBtn = document.getElementById("back");
+  var legend = document.getElementById("legend");
+
+  if (!DATA) {
+    core.innerHTML = '<p style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)">数据文件 manametal_data.js 加载失败</p>';
+    return;
+  }
+
+  var SKIP = ["已移除", "职业通用"];
+  var CLASSES = DATA.classes.filter(function (c) { return SKIP.indexOf(c.name) === -1; });
+  var GENERIC = DATA.classes.filter(function (c) { return c.name === "职业通用"; })[0];
+
+  var TIER_COLORS = {
+    "固有技能": "#ffd166",
+    "一转技能": "#4cc9f0",
+    "二转技能": "#f72585",
+    "三转技能": "#80ed99",
+    "职业通用": "#b8b8ff"
+  };
+  var TIER_ORDER = ["固有技能", "一转技能", "二转技能", "三转技能"];
+  var FILTER_ORDER = TIER_ORDER.concat(["通用技能"]);
+  var activeSkillFilter = null;
+
+  /* ------------------------------------------------ starfield -- */
+  function makeStars(count, size, cls) {
+    var el = document.createElement("div");
+    el.className = "star-layer " + cls;
+    var shadows = [];
+    for (var i = 0; i < count; i++) {
+      var x = (Math.random() * 100).toFixed(2);
+      var y = (Math.random() * 100).toFixed(2);
+      shadows.push(x + "vw " + y + "vh 0 " + (Math.random() < 0.25 ? "1px " : "0 ") + "rgba(255,255,255," + (0.35 + Math.random() * 0.6).toFixed(2) + ")");
+    }
+    el.style.width = size + "px";
+    el.style.height = size + "px";
+    el.style.borderRadius = "50%";
+    el.style.boxShadow = shadows.join(",");
+    document.body.appendChild(el);
+  }
+  makeStars(90, 1, "s1");
+  makeStars(60, 2, "s2");
+  makeStars(30, 2, "s3");
+
+  /* ------------------------------------------------ 3D orbit engine --
+     Every orb sits on a ring plane defined by (tilt, yaw). Each frame we
+     compute its 3D position, push it there with translate3d, then apply
+     the inverse of the system rotation so the orb always faces the
+     camera (billboard). Depth comes for free from CSS perspective; we
+     only fake a little distance dimming via opacity. */
+  var DEG = Math.PI / 180;
+  var ORBIT_RADIUS_SCALE = 1.5;
+  var rings = [];
+  var billboards = [];
+  var lastT = performance.now();
+  var reducedMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var sys = { x: -16, y: 0, vx: 0, vy: 0, dragging: false };
+
+  function vminPx() { return Math.min(window.innerWidth, window.innerHeight) / 100; }
+  function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+
+  function tick(now) {
+    var dt = Math.min((now - lastT) / 1000, 0.1);
+    lastT = now;
+
+    if (!sys.dragging && (sys.vx || sys.vy)) {
+      sys.x = clamp(sys.x + sys.vx * dt, -70, 40);
+      sys.y += sys.vy * dt;
+      var decay = Math.exp(-3.0 * dt);
+      sys.vx *= decay;
+      sys.vy *= decay;
+      if (Math.abs(sys.vx) < 2) sys.vx = 0;
+      if (Math.abs(sys.vy) < 2) sys.vy = 0;
+    }
+
+    orbitLayer.style.transform = "rotateX(" + sys.x.toFixed(2) + "deg) rotateY(" + sys.y.toFixed(2) + "deg)";
+
+    var sx = sys.x * DEG, sy = sys.y * DEG;
+    var csx = Math.cos(sx), snx = Math.sin(sx);
+    var csy = Math.cos(sy), sny = Math.sin(sy);
+    var face = "rotateY(" + (-sys.y).toFixed(2) + "deg) rotateX(" + (-sys.x).toFixed(2) + "deg)";
+
+    for (var b = 0; b < billboards.length; b++) {
+      billboards[b].style.transform = "translate(-50%,-50%) " + face;
+    }
+
+    var vp = vminPx();
+    for (var r = 0; r < rings.length; r++) {
+      var ring = rings[r];
+      if (!ring.paused && !reducedMotion) ring.angle += ring.speed * dt;
+      var R = ring.radius * vp;
+      var sa = Math.sin(ring.tilt * DEG), ca = Math.cos(ring.tilt * DEG);
+      var sb = Math.sin(ring.yaw * DEG), cb = Math.cos(ring.yaw * DEG);
+      var lit = ring === activeRing;
+      for (var i = 0; i < ring.items.length; i++) {
+        var it = ring.items[i];
+        var phi = (ring.angle + it.base) * DEG;
+        var cf = Math.cos(phi), sf = Math.sin(phi);
+        var vx = R * (cf * cb + sf * sa * sb);
+        var vy = R * (sf * ca);
+        var vz = R * (-cf * sb + sf * sa * cb);
+        it.el.style.transform =
+          "translate(-50%,-50%) translate3d(" + vx.toFixed(1) + "px," + vy.toFixed(1) + "px," + vz.toFixed(1) + "px) " + face;
+        var z1 = -vx * sny + vz * csy;
+        var zw = vy * snx + z1 * csx;
+        var depth = clamp(zw / R, -1, 1);
+        var depthOpacity = lit ? 1 : 0.55 + 0.45 * (depth + 1) * 0.5;
+        if (activeSkillFilter && it.categories) {
+          it.el.style.opacity = it.categories.indexOf(activeSkillFilter) !== -1 ? "1" : "0.16";
+        } else {
+          it.el.style.opacity = depthOpacity.toFixed(2);
+        }
+      }
+    }
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+
+  function sizeRingVisual(ring) {
+    var R = ring.radius * vminPx();
+    var s = ring.visual.style;
+    s.width = R * 2 + "px";
+    s.height = R * 2 + "px";
+    s.marginLeft = -R + "px";
+    s.marginTop = -R + "px";
+  }
+  window.addEventListener("resize", function () { rings.forEach(sizeRingVisual); });
+
+  function addRing(radius, speed, startAngle, tilt, yaw) {
+    var visual = document.createElement("div");
+    visual.className = "orbit-ring";
+    visual.style.transform = "rotateY(" + yaw + "deg) rotateX(" + tilt + "deg)";
+    orbitLayer.appendChild(visual);
+    var ring = {
+      radius: radius * ORBIT_RADIUS_SCALE, speed: speed, angle: startAngle || 0,
+      tilt: tilt, yaw: yaw, paused: false, items: [], visual: visual
+    };
+    sizeRingVisual(ring);
+    rings.push(ring);
+    return ring;
+  }
+
+  /* ------------------------------------------------ drag to rotate -- */
+  var dragStart = null;
+  var dragLast = null;
+  stage.addEventListener("pointerdown", function (e) {
+    if (e.target.closest(".orb, #panel, button, a")) return;
+    sys.dragging = true;
+    sys.vx = 0;
+    sys.vy = 0;
+    stage.classList.add("dragging");
+    dragStart = { x: e.clientX, y: e.clientY, sx: sys.x, sy: sys.y };
+    dragLast = { x: e.clientX, y: e.clientY, t: performance.now() };
+    try { stage.setPointerCapture(e.pointerId); } catch (err) { /* noop */ }
+  });
+  stage.addEventListener("pointermove", function (e) {
+    if (!sys.dragging || !dragStart) return;
+    sys.y = dragStart.sy + (e.clientX - dragStart.x) * 0.32;
+    sys.x = clamp(dragStart.sx - (e.clientY - dragStart.y) * 0.26, -70, 40);
+    var now = performance.now();
+    var dtm = (now - dragLast.t) / 1000;
+    if (dtm > 0.02) {
+      sys.vy = clamp(((e.clientX - dragLast.x) * 0.32) / dtm, -260, 260);
+      sys.vx = clamp((-(e.clientY - dragLast.y) * 0.26) / dtm, -260, 260);
+      dragLast = { x: e.clientX, y: e.clientY, t: now };
+    }
+  });
+  function endDrag() {
+    sys.dragging = false;
+    dragStart = null;
+    stage.classList.remove("dragging");
+  }
+  stage.addEventListener("pointerup", endDrag);
+  stage.addEventListener("pointercancel", endDrag);
+
+  /* ------------------------------------------------ panel -- */
+  var hideTimer = null;
+  var activeRing = null;
+
+  function showPanel(html, ring) {
+    if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+    if (activeRing && activeRing !== ring) activeRing.paused = false;
+    activeRing = ring;
+    ring.paused = true;
+    panel.innerHTML = html;
+    panel.classList.add("visible");
+    var lines = panel.querySelectorAll(".p-line");
+    for (var i = 0; i < lines.length; i++) {
+      lines[i].style.transitionDelay = (0.15 + i * 0.12) + "s";
+    }
+  }
+
+  function scheduleHide() {
+    if (hideTimer) clearTimeout(hideTimer);
+    hideTimer = setTimeout(function () {
+      panel.classList.remove("visible");
+      if (activeRing) { activeRing.paused = false; activeRing = null; }
+    }, 280);
+  }
+
+  panel.addEventListener("mouseenter", function () {
+    if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+  });
+  panel.addEventListener("mouseleave", scheduleHide);
+
+  function attrGrid(attrs) {
+    var keys = ["操作量", "生存", "刷本效率", "缺蓝", "对单", "特殊1", "特殊2"];
+    var html = '<div class="p-attrs">';
+    keys.forEach(function (k) {
+      if (attrs && attrs[k]) {
+        html += '<div><span class="k">' + k + '</span>' + attrs[k] + "</div>";
+      }
+    });
+    return html + "</div>";
+  }
+
+  function classPanelHTML(cls, hue) {
+    return '<div class="p-head"><div class="p-planet" style="--hue:' + hue + '"></div>' +
+      "<div><h3>" + cls.name + "</h3>" +
+      '<span class="p-badge" style="--badge-color:hsl(' + hue + ',70%,65%)">职业</span></div></div>' +
+      attrGrid(cls.attributes) +
+      '<p class="p-hint">点击行星，进入「' + cls.name + '」的技能星系</p>' +
+      '<a class="p-link" href="' + cls.review_url + '" target="_blank" rel="noopener">在 MC 百科查看职业测评 &#8599;</a>';
+  }
+
+  function skillPanelHTML(skill, tierName) {
+    var color = TIER_COLORS[tierName] || "#4cc9f0";
+    var lines = (skill.description || "").split("\n").filter(function (s) { return s.trim(); });
+    var html = '<div class="p-head">' +
+      (skill.icon ? '<img src="' + skill.icon + '" alt="" onerror="this.style.visibility=\'hidden\'">' : "") +
+      "<div><h3>" + skill.name + "</h3>" +
+      '<span class="p-badge" style="--badge-color:' + color + '">' + (skill.category || tierName) + "</span></div></div>" +
+      '<div class="p-lines">';
+    lines.forEach(function (ln) {
+      html += '<p class="p-line">' + ln.replace(/</g, "&lt;") + "</p>";
+    });
+    html += "</div>" +
+      '<a class="p-link" href="' + skill.url + '" target="_blank" rel="noopener">在 MC 百科查看 &#8599;</a>';
+    return html;
+  }
+
+  /* ------------------------------------------------ builders -- */
+  function makeClassOrb(cls, hue) {
+    var el = document.createElement("div");
+    el.className = "orb class-orb";
+    el.innerHTML = '<div class="orb-body" style="--hue:' + hue + '">' +
+      '<span class="orb-name">' + cls.name + "</span></div>";
+    return el;
+  }
+
+  function makeSkillOrb(skill, tierName, categories) {
+    var el = document.createElement("div");
+    el.className = "orb skill-orb";
+    el.dataset.skillCategories = categories.join("|");
+    var color = TIER_COLORS[tierName] || "#4cc9f0";
+    el.innerHTML = '<div class="orb-body" style="--tier-color:' + color + '">' +
+      (skill.icon ? '<img src="' + skill.icon + '" alt="" loading="lazy" onerror="this.remove()">' : "") +
+      '<span class="skill-name">' + skill.name + "</span></div>";
+    return el;
+  }
+
+  function setSkillFilter(filterName) {
+    activeSkillFilter = activeSkillFilter === filterName ? null : filterName;
+    var buttons = legend.querySelectorAll(".tier-filter");
+    for (var i = 0; i < buttons.length; i++) {
+      var pressed = buttons[i].dataset.filter === activeSkillFilter;
+      buttons[i].setAttribute("aria-pressed", pressed ? "true" : "false");
+    }
+    var skillOrbs = orbitLayer.querySelectorAll(".skill-orb");
+    for (var j = 0; j < skillOrbs.length; j++) {
+      var categories = (skillOrbs[j].dataset.skillCategories || "").split("|");
+      var matches = activeSkillFilter && categories.indexOf(activeSkillFilter) !== -1;
+      skillOrbs[j].classList.toggle("is-filter-match", !!matches);
+      skillOrbs[j].classList.toggle("is-filter-dim", !!activeSkillFilter && !matches);
+    }
+  }
+
+  function buildSkillFilters() {
+    legend.innerHTML = "";
+    FILTER_ORDER.forEach(function (filterName) {
+      var colorKey = filterName === "通用技能" ? "职业通用" : filterName;
+      var button = document.createElement("button");
+      button.type = "button";
+      button.className = "tier-filter";
+      button.dataset.filter = filterName;
+      button.setAttribute("aria-pressed", "false");
+      button.style.setProperty("--c", TIER_COLORS[colorKey]);
+      button.innerHTML = '<span class="dot" aria-hidden="true"></span><span>' + filterName + "</span>";
+      button.addEventListener("click", function () { setSkillFilter(filterName); });
+      legend.appendChild(button);
+    });
+  }
+
+  function bindOrb(el, ring, panelHTML, onClick) {
+    el.addEventListener("mouseenter", function () { showPanel(panelHTML, ring); });
+    el.addEventListener("mouseleave", scheduleHide);
+    if (onClick) {
+      el.addEventListener("click", function (e) {
+        e.stopPropagation();
+        onClick();
+      });
+    }
+  }
+
+  function setCoreOverlay(sizePx, hintText) {
+    core.innerHTML = '<div class="core-spacer" style="height:' + sizePx + 'px"></div>' +
+      '<p class="hint">' + hintText + "</p>";
+  }
+
+  function buildSystemView() {
+    orbitLayer.innerHTML = "";
+    rings = [];
+    billboards = [];
+    demoItems = [];
+    activeSkillFilter = null;
+
+    var isMobile = window.innerWidth < 760;
+    var sun = document.createElement("div");
+    sun.className = "sun";
+    sun.innerHTML = '<div class="sun-title">魔法金属</div><div class="sun-sub">十二职业</div>';
+    orbitLayer.appendChild(sun);
+    billboards.push(sun);
+    setCoreOverlay(isMobile ? 120 : 168, "拖动旋转星系 · 悬停行星暂停 · 点击进入技能星系");
+    legend.classList.remove("show");
+    backBtn.classList.remove("show");
+
+    var ringDefs = [
+      { radius: isMobile ? 22 : 19, speed: 6.5, tilt: 74, yaw: -18 },
+      { radius: isMobile ? 33 : 28, speed: -4.6, tilt: 60, yaw: 42 },
+      { radius: isMobile ? 44 : 37, speed: 3.4, tilt: 82, yaw: -55 }
+    ];
+
+    CLASSES.forEach(function (cls, i) {
+      var gi = Math.floor(i / 4);
+      var def = ringDefs[gi];
+      var ring = rings[gi];
+      if (!ring) ring = addRing(def.radius, def.speed, gi * 40, def.tilt, def.yaw);
+      var hue = Math.round(i * 30);
+      var el = makeClassOrb(cls, hue);
+      orbitLayer.appendChild(el);
+      ring.items.push({ el: el, base: (i % 4) * 90 });
+      bindOrb(el, ring, classPanelHTML(cls, hue), function () {
+        switchView(function () { buildClassView(cls, hue); });
+      });
+      demoItems.push({ ring: ring, html: classPanelHTML(cls, hue) });
+    });
+    applyTestHooks();
+  }
+
+  function buildClassView(cls, hue) {
+    orbitLayer.innerHTML = "";
+    rings = [];
+    billboards = [];
+    demoItems = [];
+    panel.classList.remove("visible");
+    if (activeRing) { activeRing.paused = false; activeRing = null; }
+    activeSkillFilter = null;
+
+    var isMobile = window.innerWidth < 760;
+    var attrs = cls.attributes || {};
+    var attrHtml = "";
+    ["操作量", "生存", "刷本效率", "对单"].forEach(function (k) {
+      if (attrs[k]) attrHtml += "<span>" + k + " <b>" + attrs[k] + "</b></span>";
+    });
+    var coreEl = document.createElement("div");
+    coreEl.className = "class-core";
+    coreEl.style.setProperty("--hue", hue);
+    coreEl.innerHTML = "<h2>" + cls.name + '</h2><div class="core-attrs">' + attrHtml + "</div>";
+    orbitLayer.appendChild(coreEl);
+    billboards.push(coreEl);
+    setCoreOverlay(isMobile ? 120 : 160, "拖动旋转 · 悬停技能查看描述");
+    backBtn.classList.add("show");
+
+    buildSkillFilters();
+    legend.classList.add("show");
+
+    var radii = isMobile ? [17, 25, 33, 41, 47] : [13.5, 20, 26.5, 33, 39.5];
+    var speeds = [7.5, -5.8, 4.6, -3.6, 2.8];
+    var tilts = [72, 64, 80, 58, 84];
+    var yaws = [-10, 38, -42, 60, -64];
+
+    var tierList = TIER_ORDER.filter(function (t) { return cls.tiers[t]; });
+    var allTiers = tierList.map(function (t) {
+      return { name: t, skills: cls.tiers[t] };
+    });
+    if (GENERIC) {
+      var genericSkills = [];
+      Object.keys(GENERIC.tiers).forEach(function (t) {
+        GENERIC.tiers[t].forEach(function (skill) {
+          genericSkills.push({ skill: skill, sourceTier: t });
+        });
+      });
+      allTiers.push({ name: "职业通用", genericSkills: genericSkills });
+    }
+
+    allTiers.forEach(function (tier, ti) {
+      var ring = addRing(radii[ti], speeds[ti], ti * 27, tilts[ti], yaws[ti]);
+      var entries = tier.genericSkills || tier.skills.map(function (skill) { return { skill: skill }; });
+      entries.forEach(function (entry, si) {
+        var skill = entry.skill;
+        var categories = tier.name === "职业通用" ? ["通用技能", entry.sourceTier] : [tier.name];
+        var el = makeSkillOrb(skill, tier.name, categories);
+        orbitLayer.appendChild(el);
+        ring.items.push({ el: el, base: si * (360 / entries.length), categories: categories });
+        var html = skillPanelHTML(skill, tier.name);
+        bindOrb(el, ring, html, function () {
+          showPanel(html, ring);
+        });
+        demoItems.push({ ring: ring, html: html });
+      });
+    });
+    applyTestHooks();
+  }
+
+  function switchView(rebuild) {
+    stage.classList.add("switching");
+    setTimeout(function () {
+      rebuild();
+      stage.classList.remove("switching");
+    }, 330);
+  }
+
+  backBtn.addEventListener("click", function () {
+    switchView(buildSystemView);
+  });
+
+  /* test hooks: ?class=N opens class N directly, &show=M opens panel M */
+  var demoItems = [];
+  function applyTestHooks() {
+    var q = new URLSearchParams(location.search);
+    var show = q.get("show");
+    if (show !== null && demoItems[+show]) {
+      showPanel(demoItems[+show].html, demoItems[+show].ring);
+    }
+  }
+  var qs = new URLSearchParams(location.search);
+  var classIdx = qs.get("class");
+  if (classIdx !== null && CLASSES[+classIdx]) {
+    buildClassView(CLASSES[+classIdx], Math.round(+classIdx * 30));
+  } else {
+    buildSystemView();
+  }
+})();
+</script>
+</body>
+</html>
